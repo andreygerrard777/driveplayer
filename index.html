@@ -120,6 +120,8 @@ let folderNames = [];
 let currentTrack = null;
 let isPlaying = false;
 let favorites = new Map(); // id -> timestamp
+let trackDurations = {}; // driveId -> duration in seconds
+try { trackDurations = JSON.parse(localStorage.getItem('dp_durations') || '{}'); } catch(e) {}
 let shuffleOn = false;
 let repeatMode = 0;
 let sortBy = "default";
@@ -563,19 +565,23 @@ function renderActiveTrack() {
 }
 
 audio.addEventListener("timeupdate", () => {
-  const bar = document.getElementById("pf");
-  const ct = document.getElementById("ct");
-  if (bar && audio.duration) {
-    const pct = audio.currentTime/audio.duration;
-    bar.style.width = (pct*100)+"%";
-    if(ct) ct.textContent = fmt(audio.currentTime);
-  }
   if (fsOpen) updateFsProgress();
+  const sub = document.getElementById('player-sub');
+  if (sub && currentTrack) {
+    if (audio.duration) sub.textContent = currentTrack.folder + ' · ' + fmt(audio.currentTime) + ' / ' + fmt(audio.duration);
+    else sub.textContent = currentTrack.folder + ' · ' + fmt(audio.currentTime);
+  }
 });
 audio.addEventListener("loadedmetadata", () => {
-  const dt = document.getElementById("dt");
-  if(dt) dt.textContent = fmt(audio.duration);
   if (fsOpen) updateFsProgress();
+  if (currentTrack && audio.duration && isFinite(audio.duration)) {
+    trackDurations[currentTrack.driveId] = Math.round(audio.duration);
+    try { localStorage.setItem('dp_durations', JSON.stringify(trackDurations)); } catch(e) {}
+  }
+  const sub = document.getElementById('player-sub');
+  if (sub && currentTrack && audio.duration) {
+    sub.textContent = currentTrack.folder + ' · ' + fmt(audio.currentTime) + ' / ' + fmt(audio.duration);
+  }
 });
 audio.addEventListener("ended", () => {
   if (repeatMode===2) { audio.currentTime=0; audio.play(); }
@@ -733,7 +739,7 @@ function renderMain() {
         `<span class="track-num">${dn}</span>`;
       return hdr + `<div class="track-row ${isAct?'active':''}" data-track-id="${t.id}" onclick="playTrackById('${t.id}')">
         <div class="track-thumb" style="background:${grad(t.folder)}">${thumb}</div>
-        <div class="track-info"><div class="track-title">${displayName(t)}</div><div class="track-sub">${t.folder}</div></div>
+        <div class="track-info"><div class="track-title">${displayName(t)}</div><div class="track-sub">${t.folder}${trackDurations[t.driveId] ? ' · '+fmt(trackDurations[t.driveId]) : ''}</div></div>
         <button class="fav-btn ${isFav?'active':''}" onclick="event.stopPropagation();toggleFav('${t.id}')">${isFav?`<svg width="16" height="16" viewBox="0 0 24 24" fill="#ec4899">${IC.heart}</svg>`:`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2a2940" stroke-width="2">${IC.heart}</svg>`}</button>
       </div>`;
     }).join("");
@@ -813,7 +819,8 @@ function renderPlayer() {
   // When buffering, show 0 progress
   const pct = isBuffering ? 0 : (audio.duration ? (audio.currentTime/audio.duration*100) : 0);
   const timeShow = isBuffering ? "0:00" : fmt(audio.currentTime);
-  const durShow = isBuffering ? "0:00" : fmt(audio.duration);
+  const cachedDur = currentTrack.driveId && trackDurations[currentTrack.driveId];
+  const durShow = isBuffering ? (cachedDur ? fmt(cachedDur) : "...") : fmt(audio.duration);
   const repCol = ["#4a4660","#6366f1","#ec4899"][repeatMode];
   const repIc = [IC.repeat,IC.repeat,IC.repeatOne][repeatMode];
 
@@ -831,7 +838,7 @@ function renderPlayer() {
       <div class="player-thumb" style="background:${grad(currentTrack.folder)}">${thumbContent}</div>
       <div style="flex:1;min-width:0">
         <div class="player-title">${displayName(currentTrack)}</div>
-        <div class="player-sub">${currentTrack.folder} · ${timeShow} / ${durShow}</div>
+        <div class="player-sub" id="player-sub">${currentTrack.folder} · ${timeShow} / ${durShow}</div>
       </div>
       <button class="fav-btn ${isFav?'active':''}" onclick="toggleFav('${currentTrack.id}')" style="padding:4px">${isFav?`<svg width="18" height="18" viewBox="0 0 24 24" fill="#ec4899">${IC.heart}</svg>`:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3a3650" stroke-width="2">${IC.heart}</svg>`}</button>
     </div>
