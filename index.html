@@ -829,14 +829,11 @@ function renderPlayer() {
   pw.innerHTML = `<div class="player">
     <div class="player-track" onclick="openFullscreen()" style="cursor:pointer">
       <div class="player-thumb" style="background:${grad(currentTrack.folder)}">${thumbContent}</div>
-      <div style="flex:1;min-width:0"><div class="player-title">${displayName(currentTrack)}</div><div class="player-sub">${currentTrack.folder}</div></div>
-      <button class="fav-btn ${isFav?'active':''}" onclick="toggleFav('${currentTrack.id}')" style="padding:4px">${isFav?`<svg width="18" height="18" viewBox="0 0 24 24" fill="#ec4899">${IC.heart}</svg>`:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3a3650" stroke-width="2">${IC.heart}</svg>`}</button>
-    </div>
-    <div class="progress-wrap">
-      <div class="progress-bar" id="pb" onclick="seekAudio(event)" ontouchstart="seekTouch(event)" ontouchmove="seekTouch(event)">
-        <div class="progress-fill" id="pf" style="width:${pct}%"><div class="progress-knob"></div></div>
+      <div style="flex:1;min-width:0">
+        <div class="player-title">${displayName(currentTrack)}</div>
+        <div class="player-sub">${currentTrack.folder} · ${timeShow} / ${durShow}</div>
       </div>
-      <div class="progress-times"><span id="ct">${timeShow}</span><span id="dt">${durShow}</span></div>
+      <button class="fav-btn ${isFav?'active':''}" onclick="toggleFav('${currentTrack.id}')" style="padding:4px">${isFav?`<svg width="18" height="18" viewBox="0 0 24 24" fill="#ec4899">${IC.heart}</svg>`:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3a3650" stroke-width="2">${IC.heart}</svg>`}</button>
     </div>
     <div class="controls">
       <button class="ctrl-btn" onclick="shuffleOn=!shuffleOn;renderPlayer()">${svg('shuffle',16,shuffleOn?'#6366f1':'#3a3650')}</button>
