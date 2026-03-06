@@ -301,14 +301,34 @@ function clearToken() {
 }
 function saveLastTrack() {
   if (!currentTrack) return;
-  try { localStorage.setItem(LAST_TRACK_KEY, currentTrack.id); } catch(e) {}
+  try {
+    localStorage.setItem(LAST_TRACK_KEY, JSON.stringify({
+      id: currentTrack.id,
+      time: audio.currentTime || 0,
+      duration: audio.duration || 0
+    }));
+  } catch(e) {}
 }
 function loadLastTrack() {
   try {
-    const id = localStorage.getItem(LAST_TRACK_KEY);
-    if (id) { const t = allTracks.find(x=>x.id===id); if(t) currentTrack=t; }
+    const raw = localStorage.getItem(LAST_TRACK_KEY);
+    if (!raw) return;
+    // Handle old format (just id string)
+    let data;
+    try { data = JSON.parse(raw); } catch(e) { data = { id: raw, time: 0 }; }
+    const t = allTracks.find(x => x.id === data.id);
+    if (t) {
+      currentTrack = t;
+      currentTrack._savedTime = data.time || 0;
+    }
   } catch(e) {}
 }
+
+// Save position periodically and on page hide
+setInterval(() => { if (isPlaying) saveLastTrack(); }, 5000);
+document.addEventListener('visibilitychange', () => { saveLastTrack(); });
+window.addEventListener('beforeunload', () => { saveLastTrack(); });
+window.addEventListener('pagehide', () => { saveLastTrack(); });
 function updateMediaSession() {
   if (!('mediaSession' in navigator) || !currentTrack) return;
   navigator.mediaSession.metadata = new MediaMetadata({
@@ -918,17 +938,32 @@ function renderMain() {
     <div class="player-wrap" id="pw"></div>
   `;
   renderPlayer();
+  // Auto-scroll to current track on first render
+  if (currentTrack && !window._initialScrollDone) {
+    window._initialScrollDone = true;
+    requestAnimationFrame(() => {
+      const active = document.querySelector('.track-row.active');
+      if (active) {
+        const contentEl = document.querySelector('.content');
+        if (contentEl) {
+          const top = active.offsetTop - contentEl.offsetTop - contentEl.clientHeight / 3;
+          contentEl.scrollTop = Math.max(0, top);
+        }
+      }
+    });
+  }
 }
 
 function renderPlayer() {
   const pw = document.getElementById("pw");
   if (!pw || !currentTrack) return;
   const isFav = favorites.has(currentTrack.id);
-  // When buffering, show 0 progress
+  // When buffering, show 0 progress; when idle show saved time
+  const savedTime = currentTrack._savedTime || 0;
   const pct = isBuffering ? 0 : (audio.duration ? (audio.currentTime/audio.duration*100) : 0);
-  const timeShow = isBuffering ? "0:00" : fmt(audio.currentTime);
+  const timeShow = isBuffering ? "0:00" : (audio.currentTime > 0 ? fmt(audio.currentTime) : fmt(savedTime));
   const cachedDur = currentTrack.driveId && trackDurations[currentTrack.driveId];
-  const durShow = isBuffering ? (cachedDur ? fmt(cachedDur) : "...") : fmt(audio.duration);
+  const durShow = isBuffering ? (cachedDur ? fmt(cachedDur) : "...") : (audio.duration ? fmt(audio.duration) : (cachedDur ? fmt(cachedDur) : "..."));
   const repCol = ["#4a4660","#6366f1","#ec4899"][repeatMode];
   const repIc = [IC.repeat,IC.repeat,IC.repeatOne][repeatMode];
 
