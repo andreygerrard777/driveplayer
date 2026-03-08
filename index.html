@@ -342,13 +342,29 @@ function releaseWakeLock() {
 setInterval(() => { if (isPlaying) saveLastTrack(); }, 3000);
 document.addEventListener('visibilitychange', () => {
   saveLastTrack();
-  // Re-acquire wake lock when page becomes visible again
-  if (document.visibilityState === 'visible' && isPlaying) {
+  if (document.visibilityState === 'visible') {
     requestWakeLock();
+    // Check if audio was killed by browser
+    if (currentTrack && (audio.paused && isPlaying)) {
+      // Browser killed our audio - auto-resume from saved position
+      console.log('Audio was killed, auto-resuming...');
+      const savedTime = audio.currentTime > 1 ? audio.currentTime : (currentTrack._savedTime || 0);
+      currentTrack._savedTime = savedTime;
+      isPlaying = false;
+      playTrack(currentTrack);
+    }
   }
 });
 window.addEventListener('beforeunload', () => { saveLastTrack(); });
 window.addEventListener('pagehide', () => { saveLastTrack(); });
+
+// Also detect audio interruption
+audio.addEventListener('pause', () => {
+  // If we didn't pause it ourselves, browser did
+  if (isPlaying && document.visibilityState === 'hidden') {
+    saveLastTrack();
+  }
+});
 function updateMediaSession() {
   if (!('mediaSession' in navigator) || !currentTrack) return;
   navigator.mediaSession.metadata = new MediaMetadata({
