@@ -305,7 +305,8 @@ function saveLastTrack() {
     localStorage.setItem(LAST_TRACK_KEY, JSON.stringify({
       id: currentTrack.id,
       time: audio.currentTime || 0,
-      duration: audio.duration || 0
+      duration: audio.duration || 0,
+      wasPlaying: isPlaying
     }));
   } catch(e) {}
 }
@@ -313,20 +314,39 @@ function loadLastTrack() {
   try {
     const raw = localStorage.getItem(LAST_TRACK_KEY);
     if (!raw) return;
-    // Handle old format (just id string)
     let data;
     try { data = JSON.parse(raw); } catch(e) { data = { id: raw, time: 0 }; }
     const t = allTracks.find(x => x.id === data.id);
     if (t) {
       currentTrack = t;
       currentTrack._savedTime = data.time || 0;
+      currentTrack._wasPlaying = data.wasPlaying || false;
     }
   } catch(e) {}
 }
 
+// Wake Lock — prevents browser from freezing the tab while music plays
+let wakeLock = null;
+async function requestWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+  } catch(e) {}
+}
+function releaseWakeLock() {
+  if (wakeLock) { wakeLock.release(); wakeLock = null; }
+}
+
 // Save position periodically and on page hide
-setInterval(() => { if (isPlaying) saveLastTrack(); }, 5000);
-document.addEventListener('visibilitychange', () => { saveLastTrack(); });
+setInterval(() => { if (isPlaying) saveLastTrack(); }, 3000);
+document.addEventListener('visibilitychange', () => {
+  saveLastTrack();
+  // Re-acquire wake lock when page becomes visible again
+  if (document.visibilityState === 'visible' && isPlaying) {
+    requestWakeLock();
+  }
+});
 window.addEventListener('beforeunload', () => { saveLastTrack(); });
 window.addEventListener('pagehide', () => { saveLastTrack(); });
 function updateMediaSession() {
@@ -445,6 +465,10 @@ async function scanDrive(forceRescan) {
     loadFavorites();
     loadLastTrack();
     renderMain();
+    // Auto-resume if was playing before reload
+    if (currentTrack && currentTrack._wasPlaying) {
+      setTimeout(() => playTrack(currentTrack), 500);
+    }
     // Background rescan to update cache silently
     setTimeout(() => bgRescan(), 3000);
     return;
@@ -595,6 +619,11 @@ async function playTrack(track, playlist) {
       if (fsOpen) updateFsArt();
       try { await audio.play(); } catch(e) { isPlaying=false; renderPlayer(); }
       if (gen !== playGeneration) { audio.pause(); return; }
+      // Restore saved position
+      if (track._savedTime && track._savedTime > 0 && audio.duration) {
+        audio.currentTime = Math.min(track._savedTime, audio.duration - 1);
+        track._savedTime = 0;
+      }
       updateMediaSession();
       if (!shuffleOn) { preloadNext(); }
       return;
@@ -627,6 +656,12 @@ async function playTrack(track, playlist) {
       if (fsOpen) updateFsArt();
     }
     if (gen !== playGeneration) { audio.pause(); return; }
+    // Restore saved position
+    if (track._savedTime && track._savedTime > 0 && audio.duration) {
+      audio.currentTime = Math.min(track._savedTime, audio.duration - 1);
+      track._savedTime = 0;
+    }
+    requestWakeLock();
     updateMediaSession();
     // Preload next
     if (!shuffleOn) { preloadedBlob = null; preloadedId = null; preloadNext(); }
@@ -786,8 +821,11 @@ function prevTrack() {
 }
 
 function togglePlay() {
-  if (isPlaying) { audio.pause(); isPlaying=false; }
-  else { if(audio.src){audio.play();isPlaying=true} else if(currentTrack) playTrack(currentTrack); }
+  if (isPlaying) { audio.pause(); isPlaying=false; releaseWakeLock(); }
+  else { 
+    if(audio.src){audio.play();isPlaying=true;requestWakeLock();} 
+    else if(currentTrack) playTrack(currentTrack); 
+  }
   renderPlayer();
 }
 
