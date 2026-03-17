@@ -191,7 +191,7 @@ body{background:var(--bg);font-family:'Manrope',sans-serif;color:var(--text-prim
 
 <script>
 const API_KEY = "AIzaSyAaMJSpKbSBGIqtEj-LW5014wPuMARDExk";
-const ROOT_FOLDER = "Mixadance";
+const ROOT_FOLDER_ID = "1NKF7kbxAliI1kJE_GEQBl3copBflHSp1";
 const DRIVE = "https://www.googleapis.com/drive/v3";
 const CACHE_KEY = "dp_tracks_cache";
 const FAV_KEY = "dp_favorites";
@@ -347,7 +347,7 @@ function updateMediaSession() {
   navigator.mediaSession.metadata = new MediaMetadata({
     title: displayName(currentTrack),
     artist: currentTrack.folder,
-    album: ROOT_FOLDER,
+    album: "Mixadance",
   });
   navigator.mediaSession.setActionHandler('play', ()=>{ audio.play(); isPlaying=true; renderPlayer(); });
   navigator.mediaSession.setActionHandler('pause', ()=>{ audio.pause(); isPlaying=false; renderPlayer(); });
@@ -428,19 +428,14 @@ async function scanDrive(forceRescan) {
     loadFavorites();
     loadLastTrack();
     renderMain();
-    // Auto-resume if was playing before reload
     if (currentTrack && currentTrack._wasPlaying) {
       setTimeout(() => playTrack(currentTrack), 500);
     }
-    // Background rescan to update cache silently
     setTimeout(() => bgRescan(), 3000);
     return;
   }
 
-  showLoading("Пошук папки Mixadance...");
-  const roots = await driveList(`name='${ROOT_FOLDER}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
-  if (!roots.length) { showError(`Папку "${ROOT_FOLDER}" не знайдено`); return; }
-  const rootId = roots[0].id;
+  const rootId = ROOT_FOLDER_ID;
 
   showLoading("Сканування підпапок...");
   const subs = await driveList(`'${rootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`);
@@ -455,8 +450,8 @@ async function scanDrive(forceRescan) {
   const rf = await driveList(`'${rootId}' in parents and ${AQ} and trashed=false`);
   if (rf.length) {
     rf.sort((a,b)=>natSort(a.name,b.name));
-    folders[ROOT_FOLDER] = rf.map((f,i)=>({id:f.id,fileName:f.name,folder:ROOT_FOLDER,folderNum:0,trackNum:i+1,driveId:f.id}));
-    folderNames.push(ROOT_FOLDER);
+    folders["Mixadance"] = rf.map((f,i)=>({id:f.id,fileName:f.name,folder:"Mixadance",folderNum:0,trackNum:i+1,driveId:f.id}));
+    folderNames.push("Mixadance");
     total += rf.length;
   }
 
@@ -485,9 +480,7 @@ async function scanDrive(forceRescan) {
 // Background rescan without UI blocking
 async function bgRescan() {
   try {
-    const roots = await driveList(`name='${ROOT_FOLDER}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
-    if (!roots.length) return;
-    const rootId = roots[0].id;
+    const rootId = ROOT_FOLDER_ID;
     const subs = await driveList(`'${rootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`);
     const AQ = "(mimeType='audio/mpeg' or mimeType='audio/mp3' or mimeType='audio/flac' or mimeType='audio/ogg' or mimeType='audio/wav' or mimeType='audio/x-wav' or mimeType='audio/aac' or mimeType='audio/mp4')";
     let newFolders = {};
@@ -497,8 +490,8 @@ async function bgRescan() {
     const rf = await driveList(`'${rootId}' in parents and ${AQ} and trashed=false`);
     if (rf.length) {
       rf.sort((a,b)=>natSort(a.name,b.name));
-      newFolders[ROOT_FOLDER] = rf.map((f,i)=>({id:f.id,fileName:f.name,folder:ROOT_FOLDER,folderNum:0,trackNum:i+1,driveId:f.id}));
-      newNames.push(ROOT_FOLDER);
+      newFolders["Mixadance"] = rf.map((f,i)=>({id:f.id,fileName:f.name,folder:"Mixadance",folderNum:0,trackNum:i+1,driveId:f.id}));
+      newNames.push("Mixadance");
       total += rf.length;
     }
     for (const sf of subs) {
@@ -878,7 +871,7 @@ function renderMain() {
         <div class="header-title">DrivePlayer</div>
         <div class="header-sub">
           <div class="dot-online" style="background:${tokenColor};box-shadow:0 0 6px ${tokenColor}88"></div>
-          ${ROOT_FOLDER} · ${allTracks.length} треків · ${folderNames.length} папок
+          Mixadance · ${allTracks.length} треків · ${folderNames.length} папок
         </div>
       </div>
       <div style="margin-left:auto;display:flex;gap:4px">
